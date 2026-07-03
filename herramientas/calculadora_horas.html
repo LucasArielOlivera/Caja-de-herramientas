@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diferencia horaria — Reporte de asistencia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --paper:#f7f6f2;
+    --card:#ffffff;
+    --ink:#1d2433;
+    --ink-soft:#5b6478;
+    --line:#e3e1d9;
+    --line-strong:#cfccc2;
+    --favor:#15803d;
+    --favor-bg:#eaf5ee;
+    --contra:#b91c1c;
+    --contra-bg:#fbece9;
+    --warn:#92600a;
+    --warn-bg:#fbf3e2;
+    --accent:#283655;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.5;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:28px 20px 64px}
+
+  header.top{margin-bottom:22px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 6px}
+  h1{font-size:27px;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--ink-soft);margin:0;font-size:14px;max-width:60ch}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 18px;margin-top:16px}
+  .card h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;font-family:var(--mono)}
+  .step{display:flex;align-items:baseline;gap:8px}
+  .step .n{font-family:var(--mono);font-size:12px;color:#fff;background:var(--accent);border-radius:5px;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;transform:translateY(2px)}
+
+  label{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:5px}
+  input[type=text]{
+    font-family:var(--mono);font-size:15px;padding:9px 11px;border:1px solid var(--line-strong);
+    border-radius:8px;background:#fff;color:var(--ink);width:100%;
+  }
+  input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .hint{font-size:12px;color:var(--ink-soft);margin-top:6px}
+
+  .field-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .field-row > div{flex:1 1 150px;min-width:130px}
+
+  .drop{
+    border:1.5px dashed var(--line-strong);border-radius:10px;padding:22px;text-align:center;
+    background:#fcfbf8;cursor:pointer;transition:.15s;
+  }
+  .drop:hover,.drop.over{border-color:var(--accent);background:#f3f2ee}
+  .drop strong{color:var(--accent)}
+  .drop small{display:block;color:var(--ink-soft);margin-top:4px;font-size:12px}
+  .filename{font-family:var(--mono);font-size:13px;margin-top:10px;color:var(--ink)}
+
+  button{font-family:var(--sans);font-size:14px;border-radius:8px;border:1px solid var(--accent);
+    background:var(--accent);color:#fff;padding:9px 16px;cursor:pointer;font-weight:600}
+  button:hover{background:#1c283f}
+  button.ghost{background:#fff;color:var(--accent)}
+  button.ghost:hover{background:#f2f1ec}
+  button.tiny{padding:4px 9px;font-size:12px;border-color:var(--line-strong);background:#fff;color:var(--ink-soft);font-weight:500}
+  button.tiny:hover{background:#f5f4f0;color:var(--contra)}
+
+  .manual-list{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+  .manual-item{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;
+    background:#f6f5f1;border:1px solid var(--line);border-radius:7px;padding:6px 10px}
+  .manual-item .d{font-weight:600}
+  .manual-item .t{color:var(--ink-soft)}
+  .manual-item button{margin-left:auto}
+
+  /* resultado */
+  #out{margin-top:18px}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+  .stat .k{font-size:12px;color:var(--ink-soft);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em}
+  .stat .v{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:4px;letter-spacing:-.01em}
+  .stat.net .v.fav{color:var(--favor)} .stat.net .v.con{color:var(--contra)}
+
+  .balancebar{height:10px;border-radius:6px;overflow:hidden;display:flex;background:var(--line);margin:2px 0 16px}
+  .balancebar .f{background:var(--favor)} .balancebar .c{background:var(--contra)}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  thead th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);
+    text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-strong);background:#fbfaf7;font-weight:600}
+  tbody td{padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px}
+  tbody tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+  td.date{font-family:var(--mono);font-weight:600}
+  td.dow{color:var(--ink-soft);font-size:13px}
+  .pill{font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .pill.fav{color:var(--favor);background:var(--favor-bg)}
+  .pill.con{color:var(--contra);background:var(--contra-bg)}
+  .pill.zero{color:var(--ink-soft);background:#eee}
+  .src{font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+  .src.man{color:var(--accent)}
+
+  .warnbox{background:var(--warn-bg);border:1px solid #ecd9ad;border-radius:10px;padding:12px 14px;margin-bottom:16px}
+  .warnbox h3{margin:0 0 6px;font-size:13px;color:var(--warn);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em}
+  .warnbox ul{margin:0;padding-left:18px}
+  .warnbox li{font-family:var(--mono);font-size:13px;color:#7a5208;margin:3px 0}
+  .warnbox li button{margin-left:8px}
+
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .empty{color:var(--ink-soft);font-size:14px;padding:24px;text-align:center;border:1px dashed var(--line-strong);border-radius:10px;font-family:var(--mono)}
+  .err{color:var(--contra);font-size:13px;margin-top:8px;font-family:var(--mono)}
+
+  .opt{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+  .opt input[type=checkbox]{width:17px;height:17px;margin-top:1px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto}
+  .opt label{margin:0;font-size:14px;color:var(--ink);cursor:pointer;font-weight:500}
+
+  @media (max-width:560px){.summary{grid-template-columns:1fr}}
+  @media print{
+    body{background:#fff}
+    .noprint{display:none!important}
+    .card,.stat,table{border-color:#bbb}
+    .wrap{padding:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <p class="eyebrow">Control de asistencia</p>
+    <h1>Diferencia horaria del reporte</h1>
+    <p class="sub">Subí el PDF de "Primer entrada y última salida". Calcula, día por día, los minutos a favor o en contra contra la jornada habitual, y totaliza el saldo.</p>
+  </header>
+
+  <!-- 1. Habitual -->
+  <section class="card noprint">
+    <h2><span class="step"><span class="n">1</span>Jornada habitual</span></h2>
+    <div class="field-row">
+      <div>
+        <label for="hab">Horas habituales por día</label>
+        <input type="text" id="hab" value="9" placeholder="9  ·  8:30  ·  8.5">
+        <p class="hint">Acepta enteros (9), decimales (8.5) o formato hora (8:30).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. PDF -->
+  <section class="card noprint">
+    <h2><span class="step"><span class="n">2</span>Cargar PDF del reporte</span></h2>
+    <div class="drop" id="drop">
+      <strong>Elegí o arrastrá el PDF</strong>
+      <small>Lee las filas con fecha + día + Tiempo Total.</small>
+    </div>
+    <input type="file" id="file" accept="application/pdf" hidden>
+    <div class="filename" id="fname"></div>
+    <div class="err" id="ferr"></div>
+    <div class="opt">
+      <input type="checkbox" id="exclLast">
+      <div>
+        <label for="exclLast">Excluir último día</label>
+        <p class="hint" style="margin:2px 0 0">No toma en cuenta el último registro del reporte. Útil cuando es el día actual y viene incompleto.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Manual -->
+  <section class="card noprint">
+    <h2><span class="step"><span class="n">3</span>Carga manual (opcional)</span></h2>
+    <p class="hint" style="margin-top:0">Para días que el reporte no trae o trae incompletos. Si la fecha ya existe en el PDF, el valor manual la reemplaza.</p>
+    <div class="field-row">
+      <div>
+        <label for="mdate">Fecha (dd-mm-aaaa)</label>
+        <input type="text" id="mdate" placeholder="30-06-2026" maxlength="10">
+      </div>
+      <div>
+        <label for="mtime">Tiempo total (hh:mm)</label>
+        <input type="text" id="mtime" placeholder="09:00" maxlength="5">
+      </div>
+      <div style="flex:0 0 auto">
+        <button id="addManual">Agregar</button>
+      </div>
+    </div>
+    <div class="err" id="merr"></div>
+    <div class="manual-list" id="mlist"></div>
+  </section>
+
+  <!-- Resultado -->
+  <section id="out"></section>
+
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const DOW = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const WD_RE = /(lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)/i;
+const DATE_RE = /(\d{4}-\d{2}-\d{2})/;
+const TIME_RE = /\b(\d{1,2}:\d{2})\b/g;
+
+let pdfRows = [];      // [{date:'YYYY-MM-DD', total:min}]  filas completas del PDF
+let pdfPending = [];   // ['YYYY-MM-DD', ...] días del PDF incompletos
+let manual = [];       // [{date:'YYYY-MM-DD', total:min}]
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const toMin = t => { const [h,m] = t.split(':').map(Number); return h*60 + m; };
+const fmtHM = mins => {
+  const s = mins < 0 ? "-" : "";
+  const a = Math.abs(mins);
+  return s + String(Math.floor(a/60)).padStart(2,'0') + ":" + String(a%60).padStart(2,'0');
+};
+const dowOf = iso => { const [y,m,d] = iso.split('-').map(Number); return DOW[new Date(y,m-1,d).getDay()]; };
+
+function parseHabitual(raw){
+  raw = (raw||"").trim().replace(',', '.');
+  if(!raw) return null;
+  if(raw.includes(':')){
+    const [h,m] = raw.split(':');
+    const H = parseInt(h,10), M = parseInt(m,10);
+    if(isNaN(H)||isNaN(M)) return null;
+    return H*60 + M;
+  }
+  const v = parseFloat(raw);
+  if(isNaN(v)) return null;
+  return Math.round(v*60);
+}
+
+// ---------- PDF ----------
+async function readPDF(file){
+  $('ferr').textContent = "";
+  $('fname').textContent = "Leyendo " + file.name + " …";
+  try{
+    const data = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data}).promise;
+    const lines = [];
+    for(let p=1; p<=pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const rows = {};
+      content.items.forEach(it=>{
+        const y = Math.round(it.transform[5]);
+        (rows[y] = rows[y] || []).push({x: it.transform[4], s: it.str});
+      });
+      Object.keys(rows).sort((a,b)=>b-a).forEach(y=>{
+        const text = rows[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim();
+        if(text) lines.push(text);
+      });
+    }
+    pdfRows = []; pdfPending = [];
+    lines.forEach(l=>{
+      if(!WD_RE.test(l)) return;          // sólo filas de día (excluye encabezado/pie)
+      const dm = l.match(DATE_RE); if(!dm) return;
+      const date = dm[1];
+      const times = l.match(TIME_RE) || [];
+      if(times.length >= 3){
+        pdfRows.push({date, total: toMin(times[times.length-1])});
+      }else{
+        pdfPending.push(date);            // fila incompleta -> requiere carga manual
+      }
+    });
+    if(pdfRows.length === 0 && pdfPending.length === 0){
+      $('ferr').textContent = "No se encontraron filas de asistencia en el PDF.";
+      $('fname').textContent = file.name;
+    }else{
+      $('fname').textContent = file.name + "  ·  " + pdfRows.length + " día(s) leído(s)" +
+        (pdfPending.length ? "  ·  " + pdfPending.length + " incompleto(s)" : "");
+    }
+  }catch(e){
+    $('ferr').textContent = "No se pudo leer el PDF: " + e.message;
+    $('fname').textContent = "";
+    pdfRows = []; pdfPending = [];
+  }
+  render();
+}
+
+// ---------- manual ----------
+function addManual(){
+  $('merr').textContent = "";
+  const dRaw = $('mdate').value.trim();
+  const tRaw = $('mtime').value.trim();
+  const dm = dRaw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if(!dm){ $('merr').textContent = "Fecha inválida. Usá dd-mm-aaaa, ej. 30-06-2026."; return; }
+  const tm = tRaw.match(/^(\d{1,2}):(\d{2})$/);
+  if(!tm){ $('merr').textContent = "Tiempo inválido. Usá hh:mm, ej. 09:00."; return; }
+  const iso = `${dm[3]}-${dm[2]}-${dm[1]}`;
+  const total = toMin(`${tm[1]}:${tm[2]}`);
+  manual = manual.filter(m => m.date !== iso);   // reemplaza si ya estaba
+  manual.push({date: iso, total});
+  $('mdate').value = ""; $('mtime').value = "";
+  render();
+}
+function removeManual(iso){ manual = manual.filter(m => m.date !== iso); render(); }
+function prefill(iso){
+  const [y,m,d] = iso.split('-');
+  $('mdate').value = `${d}-${m}-${y}`;
+  $('mtime').focus();
+}
+
+function renderManualList(){
+  const el = $('mlist');
+  if(manual.length === 0){ el.innerHTML = ""; return; }
+  el.innerHTML = manual.slice().sort((a,b)=>a.date<b.date?-1:1).map(m=>{
+    const [y,mo,d] = m.date.split('-');
+    return `<div class="manual-item">
+      <span class="d">${d}-${mo}-${y}</span>
+      <span class="t">${fmtHM(m.total)}</span>
+      <button class="tiny" onclick="removeManual('${m.date}')">Quitar</button>
+    </div>`;
+  }).join('');
+}
+
+// ---------- cálculo + render ----------
+function render(){
+  renderManualList();
+  const out = $('out');
+  const hab = parseHabitual($('hab').value);
+
+  if(pdfRows.length === 0 && manual.length === 0){
+    out.innerHTML = `<div class="empty">Subí un PDF o cargá días manualmente para ver el resultado.</div>`;
+    return;
+  }
+  if(hab === null){
+    out.innerHTML = `<div class="empty">Indicá las horas habituales por día (campo 1) para calcular.</div>`;
+    return;
+  }
+
+  // merge: manual pisa al PDF por fecha
+  const map = {};
+  pdfRows.forEach(r => map[r.date] = {date:r.date, total:r.total, src:'PDF'});
+  manual.forEach(m => map[m.date] = {date:m.date, total:m.total, src:'Manual'});
+  const rows = Object.values(map).sort((a,b)=> a.date < b.date ? -1 : 1);
+
+  // excluir último día (registro de fecha más reciente)
+  let excluded = null;
+  if($('exclLast').checked && rows.length){ excluded = rows.pop(); }
+
+  if(rows.length === 0){
+    out.innerHTML = `<div class="empty">No quedan días para calcular${excluded ? " (se excluyó el último: " + excluded.date.split('-').reverse().join('-') + ")" : ""}.</div>`;
+    return;
+  }
+
+  // pendientes que siguen sin resolver
+  const pending = pdfPending.filter(d => !map[d] && (!excluded || d !== excluded.date));
+
+  let favor = 0, contra = 0;
+  const body = rows.map(r=>{
+    const diff = r.total - hab;
+    if(diff > 0) favor += diff; else if(diff < 0) contra += -diff;
+    const [y,mo,d] = r.date.split('-');
+    const cls = diff > 0 ? 'fav' : diff < 0 ? 'con' : 'zero';
+    const lbl = diff > 0 ? `+${diff} min a favor` : diff < 0 ? `${diff} min en contra` : 'sin diferencia';
+    return `<tr>
+      <td class="date">${d}-${mo}-${y}</td>
+      <td class="dow">${dowOf(r.date)}</td>
+      <td class="num">${fmtHM(r.total)}</td>
+      <td class="num">${fmtHM(hab)}</td>
+      <td class="num"><span class="pill ${cls}">${lbl}</span></td>
+      <td class="num"><span class="src ${r.src==='Manual'?'man':''}">${r.src}</span></td>
+    </tr>`;
+  }).join('');
+
+  const net = favor - contra;
+  const netCls = net >= 0 ? 'fav' : 'con';
+  const netLbl = net >= 0 ? 'a favor' : 'en contra';
+  const tot = favor + contra || 1;
+  const favPct = (favor/tot*100).toFixed(1);
+  const conPct = (contra/tot*100).toFixed(1);
+
+  const pendingBox = pending.length ? `
+    <div class="warnbox noprint">
+      <h3>Días incompletos en el PDF (${pending.length})</h3>
+      <p class="hint" style="margin:0 0 8px;color:#7a5208">No tienen Tiempo Total completo. Cargalos a mano:</p>
+      <ul>${pending.sort().map(d=>{
+        const [y,mo,da]=d.split('-');
+        return `<li>${da}-${mo}-${y} — ${dowOf(d)} <button class="tiny" onclick="prefill('${d}')">Cargar</button></li>`;
+      }).join('')}</ul>
+    </div>` : '';
+
+  const exclNote = excluded ? `<div class="hint" style="margin-bottom:12px;font-family:var(--mono)">Último día excluido del cálculo: <strong>${excluded.date.split('-').reverse().join('-')}</strong> (${dowOf(excluded.date)}) · ${fmtHM(excluded.total)}</div>` : '';
+
+  out.innerHTML = `
+    ${pendingBox}
+    ${exclNote}
+    <div class="summary">
+      <div class="stat"><div class="k">Días computados</div><div class="v">${rows.length}</div></div>
+      <div class="stat"><div class="k">A favor / En contra</div><div class="v" style="font-size:18px"><span style="color:var(--favor)">+${fmtHM(favor)}</span> · <span style="color:var(--contra)">−${fmtHM(contra)}</span></div></div>
+      <div class="stat net"><div class="k">Saldo neto</div><div class="v ${netCls}">${net>=0?'+':'−'}${fmtHM(Math.abs(net))}</div><div class="src" style="margin-top:2px">${Math.abs(net)} min ${netLbl}</div></div>
+    </div>
+    <div class="balancebar" title="Verde a favor · Rojo en contra">
+      <div class="f" style="width:${favPct}%"></div><div class="c" style="width:${conPct}%"></div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Fecha</th><th>Día</th><th style="text-align:right">Tiempo total</th>
+        <th style="text-align:right">Habitual</th><th style="text-align:right">Diferencia</th><th style="text-align:right">Origen</th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    <div class="actions noprint">
+      <button onclick="window.print()">Imprimir / Guardar PDF</button>
+    </div>`;
+}
+
+// ---------- eventos ----------
+$('file').addEventListener('change', e => { if(e.target.files[0]) readPDF(e.target.files[0]); });
+const drop = $('drop');
+drop.addEventListener('click', ()=> $('file').click());
+drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', ()=> drop.classList.remove('over'));
+drop.addEventListener('drop', e=>{
+  e.preventDefault(); drop.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if(f && f.type === 'application/pdf') readPDF(f);
+  else $('ferr').textContent = "Soltá un archivo PDF.";
+});
+$('addManual').addEventListener('click', addManual);
+$('mtime').addEventListener('keydown', e=>{ if(e.key==='Enter') addManual(); });
+$('hab').addEventListener('input', render);
+$('exclLast').addEventListener('change', render);
+
+render();
+</script>
+</body>
+</html>
