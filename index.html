@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Caja de herramientas</title>
 <meta name="description" content="Colección de herramientas web para tareas administrativas: cálculo de horas, comparación de presupuestos y de listas de nombres.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -183,6 +183,13 @@ const HERRAMIENTAS = [
     archivo: "herramientas/comparador_nombres.html",
     descripcion: "Cruza dos listas de nombres y detecta coincidencias exactas, nombres reordenados (apellido/nombre), coincidencias parciales y registros sin correspondencia.",
     etiquetas: ["listas", "texto", "cruces"]
+  },
+  {
+    cod: "HT-004",
+    nombre: "Calculadora de actualización por tasas",
+    archivo: "herramientas/calculadora_tasas.html",
+    descripcion: "Actualiza montos aplicando series de tasas (IPC, ICL, tasa pasiva, etc.). Las series viven en el repositorio y se actualizan importando un Excel con columnas Periodo y Porcentaje.",
+    etiquetas: ["tasas", "intereses", "Excel"]
   }
 ];
 

@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de actualización por tasas</title>
+<style>
+  :root{
+    --paper:#F5F6F3;
+    --card:#FFFFFF;
+    --ink:#1B2A32;
+    --ink-soft:#5A6B74;
+    --line:#DDE3E0;
+    --accent:#0E6E5C;
+    --accent-soft:#E3F0EC;
+    --warn:#A4442A;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding:24px 16px 64px}
+  .wrap{max-width:980px;margin:0 auto}
+  header{margin-bottom:24px;border-bottom:2px solid var(--ink);padding-bottom:14px}
+  header h1{font-size:22px;font-weight:700;letter-spacing:-0.01em}
+  header p{color:var(--ink-soft);font-size:13.5px;margin-top:4px}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);margin-bottom:14px;font-weight:600}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:12px 0 4px}
+  label:first-of-type{margin-top:0}
+  input,select,button{font:inherit}
+  input[type=text],input[type=number],input[type=month],select{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:#FCFDFC;color:var(--ink)
+  }
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .num{font-family:var(--mono)}
+  button{cursor:pointer;border-radius:7px;border:1px solid var(--line);background:#fff;padding:8px 14px;font-size:14px;color:var(--ink)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.small{padding:4px 10px;font-size:12.5px}
+  button.danger{color:var(--warn);border-color:var(--line)}
+  button:hover{filter:brightness(0.97)}
+  .row{display:flex;gap:8px;align-items:end}
+  .row > div{flex:1}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:6px 8px;border-bottom:1px solid #EEF1EF}
+  td.num,th.num{text-align:right}
+  .empty{color:var(--ink-soft);font-size:13.5px;padding:14px 4px;text-align:center}
+  .resultado{margin-top:18px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:18px;display:none}
+  .resultado.visible{display:block}
+  .resultado .coef{font-family:var(--mono);font-size:34px;font-weight:700;color:var(--accent);letter-spacing:-0.02em}
+  .resultado .monto{font-family:var(--mono);font-size:22px;margin-top:4px}
+  .resultado .sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+  .detalle{max-height:260px;overflow-y:auto;margin-top:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;background:#fff;cursor:pointer}
+  .chip.activo{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .toolbar{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .aviso{font-size:12.5px;color:var(--ink-soft);margin-top:10px}
+  .check{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px}
+  .check input{width:auto}
+  .datos-scroll{max-height:380px;overflow-y:auto}
+  .status{font-size:12.5px;margin-top:8px;color:var(--accent);min-height:18px}
+  .status.error{color:var(--warn)}
+  dialog{border:1px solid var(--line);border-radius:10px;padding:20px;max-width:420px;width:90%}
+  dialog::backdrop{background:rgba(20,30,35,.35)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Calculadora de actualización por tasas</h1>
+    <p>Las series de tasas (IPC, ICL, tasa pasiva, la que quieras) se cargan desde el archivo <code>tasas_data.js</code> del repositorio. Actualizá los porcentajes importando un Excel y publicá los cambios reemplazando ese archivo.</p>
+  </header>
+
+  <div class="grid">
+    <!-- ============ PANEL IZQUIERDO: SERIES Y DATOS ============ -->
+    <div>
+      <div class="card">
+        <h2>Series de tasas</h2>
+        <div class="chips" id="chips"></div>
+        <div class="row">
+          <div>
+            <label for="nuevoNombre">Nueva serie</label>
+            <input type="text" id="nuevoNombre" placeholder="Ej: IPC INDEC">
+          </div>
+        </div>
+        <label for="nuevoTipo">Tipo de dato</label>
+        <select id="nuevoTipo">
+          <option value="variacion">Variación mensual (%)</option>
+          <option value="indice">Índice / nivel</option>
+        </select>
+        <div class="toolbar">
+          <button class="primary" id="btnCrearSerie">Crear serie</button>
+          <button class="danger" id="btnBorrarSerie">Eliminar serie activa</button>
+        </div>
+        <div class="toolbar">
+          <button class="small" id="btnExportar">Exportar Excel (modelo)</button>
+          <button class="small" id="btnImportar">Importar Excel</button>
+          <input type="file" id="fileImport" accept=".xlsx,.xls,.csv" style="display:none">
+        </div>
+        <div class="status" id="statusSeries"></div>
+      </div>
+
+      <div class="card" style="margin-top:20px" id="cardPublicar">
+        <h2>Publicar en el repositorio</h2>
+        <p style="font-size:13px;color:var(--ink-soft)">
+          Los cambios que hagas quedan guardados <strong style="color:var(--ink)">solo en este navegador</strong> hasta que
+          reemplaces el archivo <code>herramientas/tasas_data.js</code> del repo por el que descargues acá.
+          Recién ahí los ve todo el mundo.
+        </p>
+        <div class="toolbar">
+          <button class="primary small" id="btnDescargarData">Descargar tasas_data.js</button>
+          <button class="small" id="btnDescartarLocal">Descartar cambios locales</button>
+        </div>
+        <div class="status" id="statusPublicar"></div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <h2>Cargar dato en <span id="serieActivaNombre">—</span></h2>
+        <div class="row">
+          <div>
+            <label for="mesDato">Mes</label>
+            <input type="month" id="mesDato">
+          </div>
+          <div>
+            <label for="valorDato" id="labelValor">Valor</label>
+            <input type="number" id="valorDato" step="any" placeholder="Ej: 2.4">
+          </div>
+          <div style="flex:0">
+            <button class="primary" id="btnAgregar">Guardar</button>
+          </div>
+        </div>
+        <div class="aviso" id="avisoTipo"></div>
+        <div class="datos-scroll">
+          <table id="tablaDatos">
+            <thead><tr><th>Mes</th><th class="num">Valor</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="status" id="statusDatos"></div>
+      </div>
+    </div>
+
+    <!-- ============ PANEL DERECHO: CALCULADORA ============ -->
+    <div>
+      <div class="card">
+        <h2>Calcular actualización</h2>
+        <label for="calcSerie">Serie</label>
+        <select id="calcSerie"></select>
+
+        <label for="calcMonto">Monto inicial ($)</label>
+        <input type="number" id="calcMonto" step="any" placeholder="Ej: 150000">
+
+        <div class="row" style="margin-top:12px">
+          <div>
+            <label for="calcDesde">Desde (mes base)</label>
+            <input type="month" id="calcDesde">
+          </div>
+          <div>
+            <label for="calcHasta">Hasta</label>
+            <input type="month" id="calcHasta">
+          </div>
+        </div>
+
+        <div class="check" id="checkInclusivoWrap">
+          <input type="checkbox" id="calcInclusivo">
+          <label for="calcInclusivo" style="margin:0;font-weight:400;color:var(--ink)">Incluir la variación del mes base</label>
+        </div>
+
+        <div class="toolbar">
+          <button class="primary" id="btnCalcular">Calcular</button>
+          <button id="btnLimpiar">Limpiar</button>
+        </div>
+        <div class="status" id="statusCalc"></div>
+
+        <div class="resultado" id="resultado">
+          <div class="sub">Coeficiente de actualización</div>
+          <div class="coef" id="resCoef">—</div>
+          <div class="monto" id="resMonto"></div>
+          <div class="sub" id="resVariacion"></div>
+          <div class="detalle">
+            <table id="tablaDetalle">
+              <thead><tr><th>Mes</th><th class="num" id="thDetalleValor">Variación %</th><th class="num">Acumulado</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <h2>Cómo funciona el cálculo</h2>
+        <p style="font-size:13.5px;color:var(--ink-soft)">
+          <strong style="color:var(--ink)">Variación mensual:</strong> el coeficiente se arma encadenando las variaciones: (1+v₁)×(1+v₂)×… Por convención se aplican las variaciones <em>posteriores</em> al mes base (si el monto está expresado a fin del mes base). Si el monto es de principio de mes, marcá "incluir la variación del mes base".<br><br>
+          <strong style="color:var(--ink)">Índice / nivel:</strong> el coeficiente es índice(hasta) ÷ índice(desde). Sirve para series como ICL, CER, UVA o el nivel general del IPC.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlgConfirm">
+  <p id="dlgTexto" style="margin-bottom:16px"></p>
+  <div class="toolbar" style="margin-top:0">
+    <button class="primary" id="dlgSi">Sí, eliminar</button>
+    <button id="dlgNo">Cancelar</button>
+  </div>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="tasas_data.js"></script>
+<script>
+const KEY = 'calc-tasas:series';
+let data = { series: [], activa: null };
+
+// ---------- persistencia ----------
+// Fuente de verdad: window.TASAS_DATA (archivo tasas_data.js del repo).
+// Copia de trabajo: localStorage, para no perder cambios hasta publicarlos.
+const REPO_JSON = JSON.stringify(window.TASAS_DATA || { series: [], activa: null });
+
+function cargar(){
+  let local = null;
+  try{ local = localStorage.getItem(KEY); }catch(e){}
+  if(local && local !== REPO_JSON){
+    try{ data = JSON.parse(local); }catch(e){ data = JSON.parse(REPO_JSON); }
+  }else{
+    data = JSON.parse(REPO_JSON);
+    try{ localStorage.removeItem(KEY); }catch(e){}
+  }
+  if(!data.series) data = { series: [], activa: null };
+  if(data.series.length && !data.series.find(s=>s.id===data.activa)) data.activa = data.series[0].id;
+  render();
+}
+async function guardar(msgEl){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(data));
+    if(msgEl){ msgEl.textContent = 'Guardado en este navegador ✓'; msgEl.classList.remove('error'); setTimeout(()=>msgEl.textContent='',2000); }
+  }catch(e){
+    if(msgEl){ msgEl.textContent = 'No se pudo guardar. Probá de nuevo.'; msgEl.classList.add('error'); }
+  }
+  avisarPendiente();
+}
+function hayCambiosSinPublicar(){
+  return JSON.stringify(data) !== REPO_JSON;
+}
+function avisarPendiente(){
+  const st = $('statusPublicar');
+  if(hayCambiosSinPublicar()){
+    st.textContent = '● Hay cambios sin publicar en el repo.';
+    st.classList.add('error');
+  }else{
+    st.textContent = 'Sin cambios pendientes: coincide con el repo.';
+    st.classList.remove('error');
+  }
+}
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const serieActiva = () => data.series.find(s=>s.id===data.activa) || null;
+const fmtMes = m => { const [a,me]=m.split('-'); const n=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return n[+me-1]+' '+a; };
+const fmtNum = (n,dec=4) => n.toLocaleString('es-AR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const fmtPlata = n => '$ '+n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+function mesesEntre(desde,hasta){ // lista YYYY-MM desde exclusivo -> hasta inclusivo
+  const out=[]; let [a,m]=desde.split('-').map(Number);
+  const [a2,m2]=hasta.split('-').map(Number);
+  while(a<a2 || (a===a2 && m<m2)){ m++; if(m>12){m=1;a++;} out.push(`${a}-${String(m).padStart(2,'0')}`); }
+  return out;
+}
+
+// ---------- render ----------
+function render(){
+  // chips
+  const chips=$('chips'); chips.innerHTML='';
+  if(!data.series.length){ chips.innerHTML='<span class="empty">Todavía no hay series. Creá la primera abajo.</span>'; }
+  data.series.forEach(s=>{
+    const c=document.createElement('button');
+    c.className='chip'+(s.id===data.activa?' activo':'');
+    c.textContent=s.nombre;
+    c.onclick=()=>{ data.activa=s.id; guardar(); render(); };
+    chips.appendChild(c);
+  });
+  // panel datos
+  const s=serieActiva();
+  $('serieActivaNombre').textContent = s ? s.nombre : '—';
+  $('avisoTipo').textContent = s ? (s.tipo==='variacion'
+    ? 'Esta serie usa variación mensual en % (ej: 2.4 para 2,4%).'
+    : 'Esta serie usa valores de índice/nivel (ej: 7864.13).') : '';
+  $('labelValor').textContent = s && s.tipo==='indice' ? 'Índice' : 'Variación %';
+  const tb=$('tablaDatos').querySelector('tbody'); tb.innerHTML='';
+  if(s){
+    const meses=Object.keys(s.valores).sort().reverse();
+    if(!meses.length) tb.innerHTML='<tr><td colspan="3" class="empty">Sin datos cargados.</td></tr>';
+    meses.forEach(m=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${fmtMes(m)}</td><td class="num">${fmtNum(s.valores[m], s.tipo==='variacion'?2:4)}</td>
+        <td style="text-align:right"><button class="small danger" data-m="${m}">Borrar</button></td>`;
+      tr.querySelector('button').onclick=async ev=>{
+        delete s.valores[ev.target.dataset.m];
+        await guardar($('statusDatos')); render();
+      };
+      tb.appendChild(tr);
+    });
+  }
+  // selector calculadora
+  const sel=$('calcSerie'); const prev=sel.value; sel.innerHTML='';
+  data.series.forEach(x=>{ const o=document.createElement('option'); o.value=x.id; o.textContent=x.nombre+(x.tipo==='indice'?' (índice)':' (variación %)'); sel.appendChild(o); });
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+  actualizarCheckInclusivo();
+}
+function actualizarCheckInclusivo(){
+  const s=data.series.find(x=>x.id===$('calcSerie').value);
+  $('checkInclusivoWrap').style.display = (s && s.tipo==='variacion') ? 'flex' : 'none';
+}
+$('calcSerie').addEventListener('change', actualizarCheckInclusivo);
+
+// ---------- crear / borrar serie ----------
+$('btnCrearSerie').onclick=async()=>{
+  const nombre=$('nuevoNombre').value.trim();
+  const st=$('statusSeries');
+  if(!nombre){ st.textContent='Poné un nombre para la serie.'; st.classList.add('error'); return; }
+  if(data.series.some(s=>s.nombre.toLowerCase()===nombre.toLowerCase())){ st.textContent='Ya existe una serie con ese nombre.'; st.classList.add('error'); return; }
+  const id='s'+Date.now();
+  data.series.push({id, nombre, tipo:$('nuevoTipo').value, valores:{}});
+  data.activa=id; $('nuevoNombre').value='';
+  await guardar(st); render();
+};
+$('btnBorrarSerie').onclick=()=>{
+  const s=serieActiva(); if(!s) return;
+  $('dlgTexto').textContent=`¿Eliminar la serie "${s.nombre}" con todos sus datos? Esta acción no se puede deshacer.`;
+  const dlg=$('dlgConfirm'); dlg.showModal();
+  $('dlgSi').onclick=async()=>{
+    data.series=data.series.filter(x=>x.id!==s.id);
+    data.activa=data.series.length?data.series[0].id:null;
+    dlg.close(); await guardar($('statusSeries')); render();
+  };
+  $('dlgNo').onclick=()=>dlg.close();
+};
+
+// ---------- cargar dato ----------
+$('btnAgregar').onclick=async()=>{
+  const s=serieActiva(); const st=$('statusDatos');
+  if(!s){ st.textContent='Primero creá o seleccioná una serie.'; st.classList.add('error'); return; }
+  const mes=$('mesDato').value, val=parseFloat($('valorDato').value);
+  if(!mes){ st.textContent='Elegí el mes.'; st.classList.add('error'); return; }
+  if(isNaN(val)){ st.textContent='Ingresá un valor numérico.'; st.classList.add('error'); return; }
+  s.valores[mes]=val;
+  $('valorDato').value='';
+  // avanzar el mes automáticamente para carga en tanda
+  const [a,m]=mes.split('-').map(Number);
+  const sig=m===12?`${a+1}-01`:`${a}-${String(m+1).padStart(2,'0')}`;
+  $('mesDato').value=sig;
+  await guardar(st); render();
+  $('valorDato').focus();
+};
+$('valorDato').addEventListener('keydown',e=>{ if(e.key==='Enter') $('btnAgregar').click(); });
+
+// ---------- calcular ----------
+$('btnCalcular').onclick=()=>{
+  const st=$('statusCalc'); st.textContent=''; st.classList.remove('error');
+  const s=data.series.find(x=>x.id===$('calcSerie').value);
+  const monto=parseFloat($('calcMonto').value);
+  const desde=$('calcDesde').value, hasta=$('calcHasta').value;
+  if(!s){ st.textContent='Elegí una serie.'; st.classList.add('error'); return; }
+  if(!desde||!hasta||desde>=hasta){ st.textContent='Revisá el rango de meses: "desde" tiene que ser anterior a "hasta".'; st.classList.add('error'); return; }
+
+  const detalle=[]; let coef=1;
+  if(s.tipo==='variacion'){
+    let meses=mesesEntre(desde,hasta);
+    if($('calcInclusivo').checked) meses=[desde,...meses];
+    const faltan=meses.filter(m=>!(m in s.valores));
+    if(faltan.length){ st.textContent='Faltan datos para: '+faltan.map(fmtMes).join(', '); st.classList.add('error'); return; }
+    $('thDetalleValor').textContent='Variación %';
+    meses.forEach(m=>{ coef*= (1+s.valores[m]/100); detalle.push({mes:m, valor:fmtNum(s.valores[m],2)+' %', acum:coef}); });
+  }else{
+    if(!(desde in s.valores)||!(hasta in s.valores)){
+      st.textContent='Faltan los valores del índice para '+[desde,hasta].filter(m=>!(m in s.valores)).map(fmtMes).join(' y ')+'.';
+      st.classList.add('error'); return;
+    }
+    coef = s.valores[hasta]/s.valores[desde];
+    $('thDetalleValor').textContent='Índice';
+    detalle.push({mes:desde, valor:fmtNum(s.valores[desde]), acum:1});
+    detalle.push({mes:hasta, valor:fmtNum(s.valores[hasta]), acum:coef});
+  }
+
+  $('resCoef').textContent=fmtNum(coef,6);
+  $('resVariacion').textContent='Variación acumulada: '+fmtNum((coef-1)*100,2)+' %';
+  $('resMonto').textContent = !isNaN(monto) ? fmtPlata(monto)+' → '+fmtPlata(monto*coef) : '';
+  const tb=$('tablaDetalle').querySelector('tbody'); tb.innerHTML='';
+  detalle.forEach(d=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${fmtMes(d.mes)}</td><td class="num">${d.valor}</td><td class="num">${fmtNum(d.acum,6)}</td>`;
+    tb.appendChild(tr);
+  });
+  $('resultado').classList.add('visible');
+};
+$('btnLimpiar').onclick=()=>{
+  $('calcMonto').value=''; $('calcDesde').value=''; $('calcHasta').value='';
+  $('resultado').classList.remove('visible'); $('statusCalc').textContent='';
+};
+
+// ---------- Excel: exportar modelo / importar ----------
+// Modelo: dos columnas, "Periodo" (YYYY-MM) y "Porcentaje" (o valor de índice).
+$('btnExportar').onclick=()=>{
+  const s=serieActiva(); const st=$('statusSeries'); st.classList.remove('error');
+  if(!s){ st.textContent='Primero creá o seleccioná una serie.'; st.classList.add('error'); return; }
+  const meses=Object.keys(s.valores).sort();
+  const filas = meses.length
+    ? meses.map(m=>({ 'Periodo': m, 'Porcentaje': s.valores[m] }))
+    : [{ 'Periodo': '2025-01', 'Porcentaje': 2.4 }]; // fila de ejemplo si la serie está vacía
+  const ws=XLSX.utils.json_to_sheet(filas);
+  ws['!cols']=[{wch:12},{wch:12}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tasas');
+  const nombreArchivo='tasas_'+s.nombre.replace(/[^\w\-]+/g,'_')+'.xlsx';
+  XLSX.writeFile(wb, nombreArchivo);
+  st.textContent='Modelo descargado: completalo y volvé a importarlo.';
+};
+
+$('btnImportar').onclick=()=>{
+  const s=serieActiva(); const st=$('statusSeries'); st.classList.remove('error');
+  if(!s){ st.textContent='Primero creá o seleccioná la serie donde importar.'; st.classList.add('error'); return; }
+  $('fileImport').click();
+};
+
+// Acepta periodos como: 2025-03, 03/2025, 3-2025, fechas de Excel (seriales o Date)
+function normalizarPeriodo(v){
+  if(v==null) return null;
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0');
+  if(typeof v==='number'){ // serial de fecha Excel
+    const d=XLSX.SSF.parse_date_code(v);
+    if(d && d.y) return d.y+'-'+String(d.m).padStart(2,'0');
+    return null;
+  }
+  const t=String(v).trim();
+  let m=t.match(/^(\d{4})[-\/\.](\d{1,2})$/);           // 2025-03
+  if(m) return m[1]+'-'+String(+m[2]).padStart(2,'0');
+  m=t.match(/^(\d{1,2})[-\/\.](\d{4})$/);               // 03/2025
+  if(m) return m[2]+'-'+String(+m[1]).padStart(2,'0');
+  m=t.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/); // 01/03/2025 → toma mes/año
+  if(m) return m[3]+'-'+String(+m[2]).padStart(2,'0');
+  return null;
+}
+function normalizarNumero(v){
+  if(typeof v==='number') return v;
+  if(v==null) return NaN;
+  let t=String(v).trim().replace('%','').replace(/\s/g,'');
+  if(t.includes(',') && t.includes('.')) t=t.replace(/\./g,'').replace(',', '.'); // 1.234,56
+  else if(t.includes(',')) t=t.replace(',', '.');                                 // 2,4
+  return parseFloat(t);
+}
+
+$('fileImport').onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const s=serieActiva(); const st=$('statusSeries'); st.classList.remove('error');
+  try{
+    const buf=await f.arrayBuffer();
+    const wb=XLSX.read(buf,{cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const filas=XLSX.utils.sheet_to_json(ws,{defval:null});
+    if(!filas.length) throw new Error('vacío');
+
+    // detectar columnas (tolerante a mayúsculas y acentos)
+    const norm=k=>k.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+    const claves=Object.keys(filas[0]);
+    const colPeriodo=claves.find(k=>['periodo','mes','fecha'].includes(norm(k)));
+    const colValor=claves.find(k=>['porcentaje','valor','indice','variacion','%'].includes(norm(k)));
+    if(!colPeriodo||!colValor) throw new Error('columnas');
+
+    let ok=0; const errores=[];
+    filas.forEach((fila,i)=>{
+      const p=normalizarPeriodo(fila[colPeriodo]);
+      const v=normalizarNumero(fila[colValor]);
+      if(fila[colPeriodo]==null && fila[colValor]==null) return; // fila vacía
+      if(!p||isNaN(v)){ errores.push(i+2); return; }
+      s.valores[p]=v; ok++;
+    });
+
+    await guardar(); render();
+    st.textContent=`Importados ${ok} periodos en "${s.nombre}"`+(errores.length?`. Filas con error: ${errores.join(', ')}.`:' ✓');
+    if(errores.length) st.classList.add('error');
+  }catch(err){
+    st.classList.add('error');
+    st.textContent = err.message==='columnas'
+      ? 'No encontré las columnas "Periodo" y "Porcentaje". Usá el modelo de exportación.'
+      : 'No pude leer el archivo. Exportá el modelo y completalo sin cambiar el formato.';
+  }
+  e.target.value='';
+};
+
+// ---------- publicar en el repo ----------
+$('btnDescargarData').onclick=()=>{
+  const encabezado =
+`/* ═══════════════════════════════════════════════════════════════
+   TASAS_DATA — Series de tasas de la calculadora (HT-004)
+   Generado el ${new Date().toLocaleString('es-AR')} desde la herramienta.
+   Reemplazá herramientas/tasas_data.js del repo con este archivo.
+   ═══════════════════════════════════════════════════════════════ */
+window.TASAS_DATA = `;
+  const blob=new Blob([encabezado+JSON.stringify(data,null,2)+';\n'],{type:'text/javascript'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='tasas_data.js';
+  a.click(); URL.revokeObjectURL(a.href);
+  $('statusPublicar').textContent='Archivo descargado. Subilo al repo en herramientas/tasas_data.js (reemplazando el actual).';
+  $('statusPublicar').classList.remove('error');
+};
+$('btnDescartarLocal').onclick=()=>{
+  $('dlgTexto').textContent='¿Descartar los cambios locales y volver a lo que está publicado en el repo?';
+  const dlg=$('dlgConfirm'); dlg.showModal();
+  $('dlgSi').onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} dlg.close(); cargar(); avisarPendiente(); };
+  $('dlgNo').onclick=()=>dlg.close();
+};
+
+cargar();
+avisarPendiente();
+</script>
+</body>
+</html>
