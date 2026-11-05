@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Caja de herramientas</title>
-<meta name="description" content="Colección de herramientas web para tareas administrativas: cálculo de horas, comparación de presupuestos y de listas de nombres.">
+<meta name="description" content="Colección de herramientas web para tareas administrativas: cálculo de horas, comparación de presupuestos y de listas de nombres, actualización por tasas y resumen mensual de gastos.">
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -66,8 +66,18 @@
   }
   .sub{color:var(--ink-soft);font-size:15px;max-width:56ch}
 
+  /* ── títulos de sección ─────────────────────── */
+  .seccion{
+    margin-top:44px;
+    font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ink-soft);
+    display:flex;align-items:center;gap:12px;
+  }
+  .seccion::after{content:"";flex:1;height:1px;background:var(--line-strong);opacity:.6}
+  .nota{color:var(--ink-soft);font-size:13.5px;max-width:62ch;margin-top:8px}
+
   /* ── registro de herramientas ───────────────── */
-  .registro{margin-top:40px;display:flex;flex-direction:column;gap:22px}
+  .registro{margin-top:18px;display:flex;flex-direction:column;gap:22px}
 
   .ficha{
     display:block;text-decoration:none;color:inherit;position:relative;
@@ -117,6 +127,16 @@
     padding:2px 10px;color:var(--ink-soft);
   }
 
+  /* ── descargas ──────────────────────────────── */
+  .ficha .tab .arch{color:var(--ink-soft);letter-spacing:.02em}
+  .ficha.descarga:hover .flecha{transform:translateY(2px)}
+  .pip{
+    margin-top:10px;display:inline-block;
+    font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);
+    background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:4px 10px;
+  }
+  .pip b{color:var(--accent);font-weight:500}
+
   /* ── pie ────────────────────────────────────── */
   footer{
     margin-top:52px;padding-top:18px;border-top:1px solid var(--line);
@@ -132,7 +152,7 @@
   @media (prefers-reduced-motion: reduce){
     .ficha .cuerpo,.ficha h2 .flecha{transition:none}
     .ficha:hover .cuerpo{transform:none}
-    .ficha:hover .flecha{transform:none}
+    .ficha:hover .flecha,.ficha.descarga:hover .flecha{transform:none}
   }
 </style>
 </head>
@@ -147,7 +167,13 @@
     y sin enviar datos a ningún servidor.</p>
   </header>
 
-  <main class="registro" id="registro" aria-label="Listado de herramientas"></main>
+  <h2 class="seccion" id="t-herramientas">Herramientas</h2>
+  <main class="registro" id="registro" aria-labelledby="t-herramientas"></main>
+
+  <h2 class="seccion" id="t-descargas">Descargas</h2>
+  <p class="nota">Scripts de Python para usar en una PC con Python instalado. Desde acá se descargan;
+  no se ejecutan en el navegador.</p>
+  <section class="registro" id="descargas" aria-labelledby="t-descargas"></section>
 
   <footer>
     <span id="conteo"></span>
@@ -190,6 +216,13 @@ const HERRAMIENTAS = [
     archivo: "herramientas/calculadora_tasas.html",
     descripcion: "Actualiza montos aplicando series de tasas (IPC, ICL, tasa pasiva, etc.). Las series viven en el repositorio y se actualizan importando un Excel con columnas Periodo y Porcentaje.",
     etiquetas: ["tasas", "intereses", "Excel"]
+  },
+  {
+    cod: "HT-005",
+    nombre: "Resumen mensual de gastos",
+    archivo: "herramientas/resumen_gastos_mensual.html",
+    descripcion: "Lee la hoja Pagos de Detalle_gastos, toma los pagos con F. pago dentro del mes elegido y genera el archivo AAAAMM_Gastos.xlsx con totales, listo para descargar.",
+    etiquetas: ["gastos", "pagos", "Excel"]
   }
 ];
 
@@ -211,8 +244,52 @@ if (!HERRAMIENTAS.length) {
     </a>`).join("");
 }
 
+/* ══════════════════════════════════════════════════════════════
+   PARA AGREGAR UN SCRIPT A DESCARGAS:
+   1. Subí el archivo dentro de la carpeta  descargas/
+      (un .py suelto, o un .zip si el script usa varios archivos)
+   2. Agregá una entrada a este listado, siguiendo el formato del ejemplo.
+   El código (cod) es correlativo: PY-001, PY-002, ...
+   requisitos: paquetes que hay que instalar con pip ([] si no usa ninguno)
+   ══════════════════════════════════════════════════════════════ */
+const DESCARGAS = [
+  // {
+  //   cod: "PY-001",
+  //   nombre: "Nombre del script",
+  //   archivo: "descargas/mi_script.py",
+  //   descripcion: "Qué hace, qué archivos lee y qué genera.",
+  //   requisitos: ["pandas", "openpyxl"],
+  //   etiquetas: ["Excel"]
+  // }
+];
+
+const contDesc = document.getElementById("descargas");
+
+if (!DESCARGAS.length) {
+  contDesc.innerHTML = '<div class="vacio">Todavía no hay scripts para descargar.</div>';
+} else {
+  contDesc.innerHTML = DESCARGAS.map(d => {
+    const nombreArchivo = d.archivo.split("/").pop();
+    const req = d.requisitos || [];
+    const etq = d.etiquetas || [];
+    return `
+    <a class="ficha descarga" href="${d.archivo}" download="${nombreArchivo}">
+      <span class="tab"><span class="cod">${d.cod}</span><span class="arch">${nombreArchivo}</span></span>
+      <div class="cuerpo">
+        <h2>${d.nombre} <span class="flecha">↓</span></h2>
+        <p>${d.descripcion}</p>
+        ${req.length ? `<span class="pip"><b>pip install</b> ${req.join(" ")}</span>` : ""}
+        ${etq.length ? `<div class="etiquetas">${etq.map(e => `<span class="etq">${e}</span>`).join("")}</div>` : ""}
+      </div>
+    </a>`;
+  }).join("");
+}
+
+const plural = (n, s) => `${n} ${s}${n !== 1 ? "s" : ""}`;
 document.getElementById("conteo").textContent =
-  `${HERRAMIENTAS.length} herramienta${HERRAMIENTAS.length !== 1 ? "s" : ""} · en crecimiento`;
+  [plural(HERRAMIENTAS.length, "herramienta"),
+   DESCARGAS.length ? plural(DESCARGAS.length, "descarga") : null,
+   "en crecimiento"].filter(Boolean).join(" · ");
 </script>
 </body>
 </html>
